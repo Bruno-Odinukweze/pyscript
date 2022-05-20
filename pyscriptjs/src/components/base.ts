@@ -1,11 +1,10 @@
 import { loadedEnvironments, mode, pyodideLoaded } from '../stores';
-import { guidGenerator, addClasses } from '../utils';
+import { guidGenerator, addClasses, removeClasses } from '../utils';
 // Premise used to connect to the first available pyodide interpreter
 let runtime;
 let environments;
 let currentMode;
 let Element;
-
 
 pyodideLoaded.subscribe(value => {
     runtime = value;
@@ -13,7 +12,6 @@ pyodideLoaded.subscribe(value => {
 loadedEnvironments.subscribe(value => {
     environments = value;
 });
-
 
 mode.subscribe(value => {
     currentMode = value;
@@ -56,7 +54,7 @@ export class BaseEvalElement extends HTMLElement {
     }
 
     checkId() {
-        if (!this.id) this.id = this.constructor.name + '-' + guidGenerator();
+        if (!this.id) this.id = 'py-' + guidGenerator();
     }
 
     getSourceFromElement(): string {
@@ -139,15 +137,30 @@ export class BaseEvalElement extends HTMLElement {
                 this.outputElement.style.display = 'block';
             }
 
+            // check if this REPL contains errors, delete them and remove error classes
+            const errorElements = document.querySelectorAll(`div[id^='${this.errorElement.id}'][error]`);
+            if (errorElements.length > 0) {
+                for (const errorElement of errorElements) {
+                    errorElement.classList.add('hidden');
+                    if(this.hasAttribute('std-err')) {
+                        this.errorElement.hidden = true;
+                        this.errorElement.style.removeProperty('display');
+                    }
+                }
+                removeClasses(this.errorElement, ['bg-red-200', 'p-2']);
+            }
+
             this.postEvaluate();
         } catch (err) {
             if (Element === undefined) {
                 Element = pyodide.globals.get('Element');
             }
             const out = Element(this.errorElement.id);
-            
+
             addClasses(this.errorElement, ['bg-red-200', 'p-2']);
-            out.write.callKwargs(err, { append : true});
+            out.write.callKwargs(err, { append: true });
+
+            this.errorElement.children[this.errorElement.children.length - 1].setAttribute('error', '')
             this.errorElement.hidden = false;
             this.errorElement.style.display = 'block';
         }
@@ -194,25 +207,23 @@ function createWidget(name: string, code: string, klass: string) {
             //       ideally we can just wait for it to load and then run. To do
             //       so we need to replace using the promise and actually using
             //       the interpreter after it loads completely
-            // setTimeout(() => {
-            //     this.eval(this.code).then(() => {
-            //         this.proxy = this.proxyClass(this);
-            //         console.log('proxy', this.proxy);
-            //         this.proxy.connect();
-            //         this.registerWidget();
-            //     });
+            // setTimeout(async () => {
+            //     await this.eval(this.code);
+            //     this.proxy = this.proxyClass(this);
+            //     console.log('proxy', this.proxy);
+            //     this.proxy.connect();
+            //     this.registerWidget();
             // }, 2000);
             pyodideLoaded.subscribe(value => {
-                console.log("RUNTIME READY", value)
-                if ("runPythonAsync" in value){
+                console.log('RUNTIME READY', value);
+                if ('runPythonAsync' in value) {
                     runtime = value;
-                    setTimeout(() => {
-                        this.eval(this.code).then(() => {
-                            this.proxy = this.proxyClass(this);
-                            console.log('proxy', this.proxy);
-                            this.proxy.connect();
-                            this.registerWidget();
-                        });
+                    setTimeout(async () => {
+                        await this.eval(this.code);
+                        this.proxy = this.proxyClass(this);
+                        console.log('proxy', this.proxy);
+                        this.proxy.connect();
+                        this.registerWidget();
                     }, 1000);
                 }
             });
@@ -274,7 +285,7 @@ export class PyWidget extends HTMLElement {
         }
     }
 
-    connectedCallback() {
+    async connectedCallback() {
         if (this.id === undefined) {
             throw new ReferenceError(
                 `No id specified for component. Components must have an explicit id. Please use id="" to specify your component id.`,
@@ -286,10 +297,8 @@ export class PyWidget extends HTMLElement {
         mainDiv.id = this.id + '-main';
         this.appendChild(mainDiv);
         console.log('reading source');
-        this.getSourceFromFile(this.source).then((code: string) => {
-            this.code = code;
-            createWidget(this.name, code, this.klass);
-        });
+        this.code = await this.getSourceFromFile(this.source);
+        createWidget(this.name, this.code, this.klass);
     }
 
     initOutErr(): void {
@@ -313,7 +322,7 @@ export class PyWidget extends HTMLElement {
             }
 
             if (this.hasAttribute('std-err')) {
-                this.outputElement = document.getElementById(this.getAttribute('std-err'));
+                this.errorElement = document.getElementById(this.getAttribute('std-err'));
             } else {
                 this.errorElement = this.outputElement;
             }

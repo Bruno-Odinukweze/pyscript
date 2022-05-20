@@ -2,6 +2,7 @@ import * as jsyaml from 'js-yaml';
 
 import { pyodideLoaded, addInitializer } from '../stores';
 import { loadPackage, loadFromFile } from '../interpreter';
+import { handleFetchError } from '../utils';
 
 // Premise used to connect to the first available pyodide interpreter
 let pyodideReadyPromise;
@@ -9,14 +10,14 @@ let runtime;
 
 pyodideLoaded.subscribe(value => {
     runtime = value;
-    console.log("RUNTIME READY")
+    console.log('RUNTIME READY');
 });
 
 export class PyEnv extends HTMLElement {
     shadow: ShadowRoot;
     wrapper: HTMLElement;
     code: string;
-    environment: any;
+    environment: unknown;
     runtime: any;
     env: string[];
     paths: string[];
@@ -32,21 +33,27 @@ export class PyEnv extends HTMLElement {
         this.code = this.innerHTML;
         this.innerHTML = '';
 
-        const env = [];
-        const paths = [];
+        const env: string[] = [];
+        const paths: string[] = [];
 
         this.environment = jsyaml.load(this.code);
         if (this.environment === undefined) return;
 
-        for (const entry of this.environment) {
+        for (const entry of Array.isArray(this.environment) ? this.environment : []) {
             if (typeof entry == 'string') {
                 env.push(entry);
-            } else if (entry.hasOwnProperty('paths')) {
-                for (const path of entry.paths) {
-                    paths.push(path);
+            } else if (entry && typeof entry === 'object') {
+                const obj = <Record<string, unknown>>entry;
+                for (const path of Array.isArray(obj.paths) ? obj.paths : []) {
+                    if (typeof path === 'string') {
+                        paths.push(path);
+                    }
                 }
             }
         }
+
+        this.env = env;
+        this.paths = paths;
 
         async function loadEnv() {
             await loadPackage(env, runtime);
@@ -54,9 +61,14 @@ export class PyEnv extends HTMLElement {
         }
 
         async function loadPaths() {
-            const pyodide = await pyodideReadyPromise;
             for (const singleFile of paths) {
-                await loadFromFile(singleFile, runtime);
+                console.log(`loading ${singleFile}`);
+                try {
+                    await loadFromFile(singleFile, runtime);
+                } catch (e) {
+                    //Should we still export full error contents to console?
+                    handleFetchError(e, singleFile);
+                }
             }
             console.log('paths loaded');
         }
