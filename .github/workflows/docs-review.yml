@@ -4,6 +4,8 @@ on:
     pull_request:
         branches:
         -   '*'
+        paths:
+        -   docs/**
 
 concurrency:
   # Concurrency group that uses the workflow name and PR number if available
@@ -16,6 +18,7 @@ concurrency:
 
 jobs:
     build:
+        if: github.repository_owner == 'pyscript'
         runs-on: ubuntu-latest
         permissions:
             contents: read
@@ -54,7 +57,7 @@ jobs:
         -   name: Configure AWS credentials
             uses: aws-actions/configure-aws-credentials@v1.6.1
             with:
-                aws-region: ${{secrets.AWS_REGION}}
+                aws-region: ${{ secrets.AWS_REGION }}
                 role-to-assume: ${{ secrets.AWS_OIDC_RUNNER_ROLE }}
 
         -   name: Copy redirect file

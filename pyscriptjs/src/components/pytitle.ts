@@ -2,9 +2,6 @@ import { BaseEvalElement } from './base';
 import { addClasses, htmlDecode } from '../utils';
 
 export class PyTitle extends BaseEvalElement {
-    shadow: ShadowRoot;
-    wrapper: HTMLElement;
-    theme: string;
     widths: Array<string>;
     label: string;
     mount_name: string;
@@ -20,8 +17,7 @@ export class PyTitle extends BaseEvalElement {
         const mainDiv = document.createElement('div');
         const divContent = document.createElement('h1');
 
-        addClasses(mainDiv, ['text-center', 'w-full', 'mb-8']);
-        addClasses(divContent, ['text-3xl', 'font-bold', 'text-gray-800', 'uppercase', 'tracking-tight']);
+        addClasses(mainDiv, ['py-title']);
         divContent.innerHTML = this.label;
 
         mainDiv.id = this.id;

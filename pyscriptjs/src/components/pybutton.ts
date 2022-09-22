@@ -1,10 +1,11 @@
 import { BaseEvalElement } from './base';
 import { addClasses, htmlDecode } from '../utils';
+import { getLogger } from '../logger'
+
+const logger = getLogger('py-button');
+
 
 export class PyButton extends BaseEvalElement {
-    shadow: ShadowRoot;
-    wrapper: HTMLElement;
-    theme: string;
     widths: Array<string>;
     label: string;
     class: Array<string>;
@@ -13,7 +14,7 @@ export class PyButton extends BaseEvalElement {
     constructor() {
         super();
 
-        this.defaultClass = ['p-2', 'text-white', 'bg-blue-600', 'border', 'border-blue-600', 'rounded'];
+        this.defaultClass = ['py-button'];
 
         if (this.hasAttribute('label')) {
             this.label = this.getAttribute('label');
@@ -51,7 +52,7 @@ export class PyButton extends BaseEvalElement {
 
         this.appendChild(mainDiv);
         this.code = this.code.split('self').join(this.mount_name);
-        let registrationCode = `from pyodide import create_proxy`;
+        let registrationCode = `from pyodide.ffi import create_proxy`;
         registrationCode += `\n${this.mount_name} = Element("${mainDiv.id}")`;
         if (this.code.includes('def on_focus')) {
             this.code = this.code.replace('def on_focus', `def on_focus_${this.mount_name}`);
@@ -65,12 +66,12 @@ export class PyButton extends BaseEvalElement {
 
         // now that we appended and the element is attached, lets connect with the event handlers
         // defined for this widget
-        setTimeout(async () => {
+        this.runAfterRuntimeInitialized(async () => {
             await this.eval(this.code);
             await this.eval(registrationCode);
-            console.log('registered handlers');
-        }, 4000);
+            logger.debug('registered handlers');
+        });
 
-        console.log('py-button connected');
+        logger.debug('py-button connected');
     }
 }
