@@ -1,4 +1,4 @@
-# How-to guides
+# Guides
 
 Welcome to the how-to documentation section for PyScript. If you've already
 gained some experience with PyScript before and just need practical guides
@@ -15,4 +15,5 @@ glob:
 caption: 'Contents:'
 ---
 passing-objects
+http-requests
 ```
